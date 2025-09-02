@@ -434,8 +434,6 @@ class Html
             $newElement->getStyle()->setBorderSize(Converter::pixelToTwip($border));
         }
 
-        $elementStyles = self::parseInlineStyle($node, $styles['table']);
-        $newElement = $element->addTable($elementStyles);
         return $newElement;
     }
 
