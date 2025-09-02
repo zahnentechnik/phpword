@@ -80,6 +80,10 @@ class Html
         $html = str_replace('&', '&amp;', $html);
         $html = str_replace(['_lt_', '_gt_', '_amp_', '_quot_'], ['&lt;', '&gt;', '&amp;', '&quot;'], $html);
 
+        // due to a bug in the HTML converter the "&amp;" is inserted as "&" in
+        // the XML documents and make it unreadable for at least LibreOffice
+        $html = str_replace('&amp;', '&#65286;', $html);
+
         if (false === $fullHTML) {
             $html = '<body>' . $html . '</body>';
         }
@@ -132,7 +136,7 @@ class Html
                         $val = $val === 'auto' ? '100%' : $val;
                         if (false !== strpos($val, '%')) {
                             // e.g. <table width="100%"> or <td width="50%">
-                            $styles['width'] = (int) $val * 50;
+                            $styles['width'] = (int)$val * 50;
                             $styles['unit'] = \PhpOffice\PhpWord\SimpleType\TblWidth::PERCENT;
                         } else {
                             // e.g. <table width="250> where "250" = 250px (always pixels)
@@ -430,6 +434,8 @@ class Html
             $newElement->getStyle()->setBorderSize(Converter::pixelToTwip($border));
         }
 
+        $elementStyles = self::parseInlineStyle($node, $styles['table']);
+        $newElement = $element->addTable($elementStyles);
         return $newElement;
     }
 
@@ -467,6 +473,14 @@ class Html
      */
     protected static function parseCell($node, $element, &$styles)
     {
+        // add standard styles
+        $default = [
+            'valign' => 'top'
+        ];
+        foreach($default as $key => $value) {
+            if(empty($styles['cell'][$key])) $styles['cell'][$key] = $value;
+        }
+
         $cellStyles = self::recursiveParseStylesInHierarchy($node, $styles['cell']);
 
         $colspan = $node->getAttribute('colspan');
@@ -574,7 +588,7 @@ class Html
             foreach ($node->attributes as $attribute) {
                 switch ($attribute->name) {
                     case 'start':
-                        $start = (int) $attribute->value;
+                        $start = (int)$attribute->value;
 
                         break;
                     case 'type':
@@ -611,15 +625,15 @@ class Html
             return [
                 'type' => 'multilevel',
                 'levels' => [
-                    ['format' => NumberFormat::DECIMAL,      'text' => '%1.', 'alignment' => 'left',  'tabPos' => 720,  'left' => 720,  'hanging' => 360],
-                    ['format' => NumberFormat::LOWER_LETTER, 'text' => '%2.', 'alignment' => 'left',  'tabPos' => 1440, 'left' => 1440, 'hanging' => 360],
-                    ['format' => NumberFormat::LOWER_ROMAN,  'text' => '%3.', 'alignment' => 'right', 'tabPos' => 2160, 'left' => 2160, 'hanging' => 180],
-                    ['format' => NumberFormat::DECIMAL,      'text' => '%4.', 'alignment' => 'left',  'tabPos' => 2880, 'left' => 2880, 'hanging' => 360],
-                    ['format' => NumberFormat::LOWER_LETTER, 'text' => '%5.', 'alignment' => 'left',  'tabPos' => 3600, 'left' => 3600, 'hanging' => 360],
-                    ['format' => NumberFormat::LOWER_ROMAN,  'text' => '%6.', 'alignment' => 'right', 'tabPos' => 4320, 'left' => 4320, 'hanging' => 180],
-                    ['format' => NumberFormat::DECIMAL,      'text' => '%7.', 'alignment' => 'left',  'tabPos' => 5040, 'left' => 5040, 'hanging' => 360],
-                    ['format' => NumberFormat::LOWER_LETTER, 'text' => '%8.', 'alignment' => 'left',  'tabPos' => 5760, 'left' => 5760, 'hanging' => 360],
-                    ['format' => NumberFormat::LOWER_ROMAN,  'text' => '%9.', 'alignment' => 'right', 'tabPos' => 6480, 'left' => 6480, 'hanging' => 180],
+                    ['format' => NumberFormat::DECIMAL, 'text' => '%1.', 'alignment' => 'left', 'tabPos' => 720, 'left' => 720, 'hanging' => 360],
+                    ['format' => NumberFormat::LOWER_LETTER, 'text' => '%2.', 'alignment' => 'left', 'tabPos' => 1440, 'left' => 1440, 'hanging' => 360],
+                    ['format' => NumberFormat::LOWER_ROMAN, 'text' => '%3.', 'alignment' => 'right', 'tabPos' => 2160, 'left' => 2160, 'hanging' => 180],
+                    ['format' => NumberFormat::DECIMAL, 'text' => '%4.', 'alignment' => 'left', 'tabPos' => 2880, 'left' => 2880, 'hanging' => 360],
+                    ['format' => NumberFormat::LOWER_LETTER, 'text' => '%5.', 'alignment' => 'left', 'tabPos' => 3600, 'left' => 3600, 'hanging' => 360],
+                    ['format' => NumberFormat::LOWER_ROMAN, 'text' => '%6.', 'alignment' => 'right', 'tabPos' => 4320, 'left' => 4320, 'hanging' => 180],
+                    ['format' => NumberFormat::DECIMAL, 'text' => '%7.', 'alignment' => 'left', 'tabPos' => 5040, 'left' => 5040, 'hanging' => 360],
+                    ['format' => NumberFormat::LOWER_LETTER, 'text' => '%8.', 'alignment' => 'left', 'tabPos' => 5760, 'left' => 5760, 'hanging' => 360],
+                    ['format' => NumberFormat::LOWER_ROMAN, 'text' => '%9.', 'alignment' => 'right', 'tabPos' => 6480, 'left' => 6480, 'hanging' => 180],
                 ],
             ];
         }
@@ -745,7 +759,7 @@ class Html
                         //matches percentages
                         $spacingLineRule = \PhpOffice\PhpWord\SimpleType\LineSpacingRule::AUTO;
                         //we are subtracting 1 line height because the Spacing writer is adding one line
-                        $spacing = ((((int) $matches[1]) / 100) * Paragraph::LINE_HEIGHT) - Paragraph::LINE_HEIGHT;
+                        $spacing = ((((int)$matches[1]) / 100) * Paragraph::LINE_HEIGHT) - Paragraph::LINE_HEIGHT;
                     } else {
                         //any other, wich is a multiplier. E.g. 1.2
                         $spacingLineRule = \PhpOffice\PhpWord\SimpleType\LineSpacingRule::AUTO;
@@ -856,6 +870,10 @@ class Html
 
                     break;
 
+                case 'margin-left':
+                    $styles['indentation']['left'] = Converter::cssToPoint($value);
+                    
+                    break;
                 case 'border-color':
                     self::mapBorderColor($styles, $value);
 
@@ -908,7 +926,7 @@ class Html
                         // This may be adjusted, if better ratio or formula found.
                         // BC change: up to ver. 0.17.0 was $size converted to points - Converter::cssToPoint($size)
                         $size = Converter::cssToTwip($matches[1]);
-                        $size = (int) ($size / 2);
+                        $size = (int)($size / 2);
                         // valid variants may be e.g. borderSize, borderTopSize, borderLeftColor, etc ..
                         $styles["border{$which}Size"] = $size; // twips
                         $styles["border{$which}Color"] = trim($matches[2], '#');
@@ -1231,14 +1249,14 @@ class Html
         $fontStyle = $styles + ['size' => 3];
 
         $paragraphStyle = $styles + [
-            'lineHeight' => 0.25, // multiply default line height - e.g. 1, 1.5 etc
-            'spacing' => 0, // twip
-            'spaceBefore' => 120, // twip, 240/2 (default line height)
-            'spaceAfter' => 120, // twip
-            'borderBottomSize' => empty($styles['line-height']) ? 1 : $styles['line-height'],
-            'borderBottomColor' => empty($styles['color']) ? '000000' : $styles['color'],
-            'borderBottomStyle' => 'single', // same as "solid"
-        ];
+                'lineHeight' => 0.25, // multiply default line height - e.g. 1, 1.5 etc
+                'spacing' => 0, // twip
+                'spaceBefore' => 120, // twip, 240/2 (default line height)
+                'spaceAfter' => 120, // twip
+                'borderBottomSize' => empty($styles['line-height']) ? 1 : $styles['line-height'],
+                'borderBottomColor' => empty($styles['color']) ? '000000' : $styles['color'],
+                'borderBottomStyle' => 'single', // same as "solid"
+            ];
 
         $element->addText('', $fontStyle, $paragraphStyle);
 
